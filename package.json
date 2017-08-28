@@ -1,0 +1,33 @@
+{
+  "name": "fabric-client-util-v1",
+  "version": "1.0.0",
+  "description": "Utility using typescript for fabric client v1.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/suddutt1/fabric-client-util-v1.git"
+  },
+  "keywords": [
+    "node",
+    "hfc",
+    "typescript"
+  ],
+  "author": "Sudip Dutta",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/suddutt1/fabric-client-util-v1/issues"
+  },
+  "homepage": "https://github.com/suddutt1/fabric-client-util-v1#readme",
+  "devDependencies": {
+    "@types/node": "^8.0.25",
+    "typescript": "^2.4.2"
+  },
+  "dependencies": {
+    "fabric-ca-client": "^1.0.0",
+    "fabric-client": "^1.0.0",
+    "log4js": "^0.6.38"
+  }
+}
