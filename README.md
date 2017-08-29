@@ -29,7 +29,7 @@ Artifcats must be generated and placed under dist/artifcats folder
 
 Configuration file network=config.json
 
-To run ( mychannel1 is the channel name and xcc is chain code )
+To run ( mychannel1 is the channel name and xcc is chain code ) 
 
 ```sh
 
