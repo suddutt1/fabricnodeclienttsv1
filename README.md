@@ -44,5 +44,6 @@ node ./dist/index.js org2 query  mychannel1 xcc get X
 
 
 ```
+all the necessary artifacts must be generated
 
 
