@@ -25,15 +25,17 @@ export class HFCClient {
     private credStoragePath: string
     private channelMap: any = {}
     private caClient:CAClient = null
+    private gopath:string = null
     /**
      * 
      * @param orgConfig Peer config for the organization
      * @param ordererConfig Configration of orderer in an array . 
      * @param credPath Strorage path for the ceredentials
      * @param caClient CACLient instance ( Assumption is it it initialized)
+     * @param chainCodePath Path to chaincode to be installed . Do not include src directory
      */
 
-    constructor(orgConfig: any, ordererConfig: any[], credPath: string,caClient:CAClient) {
+    constructor(orgConfig: any, ordererConfig: any[], credPath: string,caClient:CAClient,chainCodePath:string) {
 
         this.org = orgConfig.name
         this.mspId = orgConfig.mspid
@@ -41,6 +43,7 @@ export class HFCClient {
         this.ordererConfig = ordererConfig
         this.credStoragePath = credPath + "_" + this.org
         this.caClient = caClient
+        this.gopath = chainCodePath
     }
     /**
      * Initialization 
@@ -173,7 +176,7 @@ export class HFCClient {
     public async installChainCode(chaincodeId: string, chaincodePath: string, chaincodeVersion: string): Promise<boolean> {
         let isSuccess = false
         try {
-            process.env.GOPATH = path.join(__dirname, "../artifacts")
+            process.env.GOPATH = path.join(__dirname, this.gopath)
             var isAdminEnrolled = await this.getOrgAdmin()
             if (isAdminEnrolled) {
                 var request = {
