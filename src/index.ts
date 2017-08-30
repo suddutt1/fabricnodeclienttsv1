@@ -52,9 +52,9 @@ class NetworkDriver {
             let networkConfig = JSON.parse(Buffer.from(networkConfigStr).toString())['network-config']
             let orderers: object[] = networkConfig['orderer']
             var orgConfig = networkConfig[org]
-            var caClient = new CAClient(orgConfig["ca"], "admin", "adminpw", orgConfig["mspid"], org);
-            var rslt: boolean = await caClient.init();
-            var orgHFCLient = new HFCClient(orgConfig, orderers, "~/xxxz", caClient, "../artifacts")
+            //var caClient = new CAClient(orgConfig["ca"], "admin", "adminpw", orgConfig["mspid"], org);
+            //var rslt: boolean = await caClient.init();
+            var orgHFCLient = new HFCClient(orgConfig, orderers, "~/xxxz", "../artifacts")
             var rslt = await orgHFCLient.init()
             if (rslt) {
                 this.logger.info("CA Client Intialization result :" + rslt);
@@ -106,12 +106,12 @@ class NetworkDriver {
                     var channelId = process.argv[4]
                     var chainId = process.argv[5]
                     var invkMethName = process.argv[6]
-                    if (channelId != null && chainId != null && initMethName != null) {
+                    if (channelId != null && chainId != null && invkMethName != null) {
                         var params = this.getParameters(7)
-                        var isTrxnSuccessful = await orgHFCLient.invokeChainCode(channelId, chainId, invkMethName, params, "suddutt1", "cnp4test")
+                        var isTrxnSuccessful = await orgHFCLient.invokeChainCode(channelId, chainId, invkMethName, params, org+"_user")
                         this.logger.info("Invoke chain code " + isTrxnSuccessful)
                     } else {
-                        this.logger.error(`Channel id, Chaincode id,init method name  not provided `)
+                        this.logger.error(`Channel id, Chaincode id,invoke method name  not provided `)
                     }
                 } else if (command == "query") {
                     var channelId = process.argv[4]
@@ -119,7 +119,7 @@ class NetworkDriver {
                     var queryMethName = process.argv[6]
                     if (channelId != null && chainId != null && queryMethName != null) {
                         var params = this.getParameters(7)
-                        var isQuerySuccess = await orgHFCLient.queryChaincode(channelId, chainId, queryMethName, params, "suddutt1", "cnp4test")
+                        var isQuerySuccess = await orgHFCLient.queryChaincode(channelId, chainId, queryMethName, params, org+"_user")
                         this.logger.info("Query chain code " + isQuerySuccess)
                     } else {
                         this.logger.error(`Channel id, Chaincode id,init method name  not provided `)

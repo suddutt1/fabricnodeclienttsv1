@@ -24,7 +24,7 @@ export class HFCClient {
     private logger = log4js.getLogger('HFClient');
     private credStoragePath: string
     private channelMap: any = {}
-    private caClient:CAClient = null
+    //private caClient:CAClient = null
     private gopath:string = null
     /**
      * 
@@ -35,14 +35,13 @@ export class HFCClient {
      * @param chainCodePath Path to chaincode to be installed . Do not include src directory
      */
 
-    constructor(orgConfig: any, ordererConfig: any[], credPath: string,caClient:CAClient,chainCodePath:string) {
+    constructor(orgConfig: any, ordererConfig: any[], credPath: string,chainCodePath:string) {
 
         this.org = orgConfig.name
         this.mspId = orgConfig.mspid
         this.organizationConfig = orgConfig
         this.ordererConfig = ordererConfig
         this.credStoragePath = credPath + "_" + this.org
-        this.caClient = caClient
         this.gopath = chainCodePath
     }
     /**
@@ -309,7 +308,7 @@ export class HFCClient {
      * @param userId string user 
      * @param secret string secret
      */
-    public async invokeChainCode(channelId: string, chainCodeId: string, functionName: string, args: any[],userId:string,secret:string ): Promise<boolean> {
+    public async invokeChainCode(channelId: string, chainCodeId: string, functionName: string, args: any[],userId:string ): Promise<boolean> {
         let isSuccess = false
         let channel:any = null
         try {
@@ -324,7 +323,7 @@ export class HFCClient {
                 this.channelMap[channelId] = channel
             }
             var targets = this.setupPeers(null)
-            var appUser = await this.caClient.loginUser(userId,secret)
+            var appUser = await this.getUser(userId)
             if(appUser!=null){
                 this.client.setUserContext(appUser)
                 var  tx_id = this.client.newTransactionID()
@@ -382,7 +381,7 @@ export class HFCClient {
      * @param userId string userid
      * @param secret string secret for enrollment
      */
-    public async queryChaincode(channelId:string, chaincodeId:string, functionName:string, args:any[], userId:string,secret:string):Promise<any>{
+    public async queryChaincode(channelId:string, chaincodeId:string, functionName:string, args:any[], userId:string):Promise<any>{
         let queryOutput = "XXX"
         let channel:any = null
         try{
@@ -397,7 +396,7 @@ export class HFCClient {
                 this.channelMap[channelId] = channel
             }
            
-            var appUser = await this.caClient.loginUser(userId,secret)
+            var appUser = await this.getUser(userId)
             if(appUser!=null){
                 this.client.setUserContext(appUser)
                 var targets = this.setupPeers(null)
@@ -431,6 +430,32 @@ export class HFCClient {
         }
         return new Promise<any>((resolve)=>{resolve(queryOutput)})
     }
+        /**
+     * Loads the org admin from the config details 
+     */
+    private async getUser(userId:string): Promise<ApplicationUser> {
+        let usr:ApplicationUser = null
+        try {
+            var credentialBaseDir = this.readUserCredentials()[userId]
+            var keyPath = path.join(__dirname, credentialBaseDir+"/msp/keystore");
+            var keyPEM = Buffer.from(this.readAllFiles(keyPath)[0]).toString();
+            var certPath = path.join(__dirname, credentialBaseDir+"//msp/signcerts");
+            var certPEM = this.readAllFiles(certPath)[0].toString();
+            var enrolledUser = await this.client.createUser({
+                username: userId, mspid: this.mspId, cryptoContent: {
+                    privateKeyPEM: keyPEM,
+                    signedCertPEM: certPEM
+                }
+            })
+            if(enrolledUser!=null){
+                usr = enrolledUser
+            }
+            
+        } catch (exp) {
+            this.logger.error(`Error in retriveing the org admin for ${this.org}`, exp)
+        }
+        return new Promise<ApplicationUser>((resolve) => { resolve(usr) });
+    }
     /**
      * Loads the org admin from the config details 
      */
@@ -454,6 +479,12 @@ export class HFCClient {
             this.logger.error(`Error in retriveing the org admin for ${this.org}`, exp)
         }
         return new Promise<boolean>((resolve) => { resolve(isSuccess) });
+    }
+    private readUserCredentials():any {
+        let file_path = path.join(__dirname, "../../user_cred_map.json");
+        let data = fs.readFileSync(file_path);
+        let credentialMap = JSON.parse(Buffer.from(data).toString())
+        return credentialMap
     }
     /**
      * Reads all the files from the input directory

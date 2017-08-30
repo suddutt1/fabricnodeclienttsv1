@@ -1,0 +1,4 @@
+{
+    "org1_user":"../artifacts/crypto-config/peerOrganizations/org1.example.com/users/User1@org1.example.com",
+    "org2_user":"../artifacts/crypto-config/peerOrganizations/org2.example.com/users/User1@org2.example.com"
+}
