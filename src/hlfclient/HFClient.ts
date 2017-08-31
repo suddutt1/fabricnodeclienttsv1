@@ -13,6 +13,7 @@ import { CAClient } from './CAClient';
  * Hyperledger Fabic HFC client wrapper . One client is tied with only one organization
  */
 export class HFCClient {
+    private orgId: string
     private org: string
     private mspId: string
     private client: HFC
@@ -24,8 +25,11 @@ export class HFCClient {
     private logger = log4js.getLogger('HFClient');
     private credStoragePath: string
     private channelMap: any = {}
-    //private caClient:CAClient = null
-    private gopath:string = null
+    private useCAForUserAuth: boolean = false
+    private caClient: CAClient = null
+
+    private gopath: string = null
+    private userCredentialPath:string = null
     /**
      * 
      * @param orgConfig Peer config for the organization
@@ -35,14 +39,16 @@ export class HFCClient {
      * @param chainCodePath Path to chaincode to be installed . Do not include src directory
      */
 
-    constructor(orgConfig: any, ordererConfig: any[], credPath: string,chainCodePath:string) {
-
+    constructor(orgId, orgConfig: any, ordererConfig: any[], credStorePath: string, chainCodePath: string, userCredentialPath:string,useCAForAuth: boolean) {
+        this.orgId = orgId
         this.org = orgConfig.name
         this.mspId = orgConfig.mspid
         this.organizationConfig = orgConfig
         this.ordererConfig = ordererConfig
-        this.credStoragePath = credPath + "_" + this.org
+        this.credStoragePath = credStorePath + "_" + this.org
         this.gopath = chainCodePath
+        this.useCAForUserAuth = useCAForAuth
+        this.userCredentialPath = userCredentialPath
     }
     /**
      * Initialization 
@@ -62,7 +68,14 @@ export class HFCClient {
                 path: this.credStoragePath + "_x"
             })
             this.client.setStateStore(store)
-            isSuccess = true
+            if (this.useCAForUserAuth) {
+                var caURL = this.organizationConfig["ca"]
+                this.caClient = new CAClient(caURL, "admin", "adminpw", this.organizationConfig["mspid"], this.orgId);
+                //Initialize the CA
+                isSuccess = await this.caClient.init()
+            } else {
+                isSuccess = true
+            }
         } catch (exp) {
             this.logger.error(`Error in Client intiiatization for ${this.org}`, exp);
             isSuccess = false;
@@ -308,9 +321,9 @@ export class HFCClient {
      * @param userId string user 
      * @param secret string secret
      */
-    public async invokeChainCode(channelId: string, chainCodeId: string, functionName: string, args: any[],userId:string ): Promise<boolean> {
+    public async invokeChainCode(channelId: string, chainCodeId: string, functionName: string, args: any[], userId: string): Promise<boolean> {
         let isSuccess = false
-        let channel:any = null
+        let channel: any = null
         try {
             if (this.channelMap[channelId] != null) {
                 this.logger.debug("Reading from map")
@@ -324,14 +337,14 @@ export class HFCClient {
             }
             var targets = this.setupPeers(null)
             var appUser = await this.getUser(userId)
-            if(appUser!=null){
+            if (appUser != null) {
                 this.client.setUserContext(appUser)
-                var  tx_id = this.client.newTransactionID()
+                var tx_id = this.client.newTransactionID()
                 var propRequest = {
                     targets: targets,
                     fcn: functionName,
                     args: args,
-                    chaincodeId:chainCodeId,
+                    chaincodeId: chainCodeId,
                     txId: tx_id
                 };
                 var proposalRespRslt = await channel.sendTransactionProposal(propRequest);
@@ -339,7 +352,7 @@ export class HFCClient {
                 var proposal = proposalRespRslt[1];
                 var header = proposalRespRslt[2];
                 var all_good = true;
-                proposalResponses.forEach((peerResp,index)=> {
+                proposalResponses.forEach((peerResp, index) => {
                     let one_good = false;
                     if (peerResp && peerResp.response &&
                         peerResp.response.status === 200) {
@@ -350,20 +363,20 @@ export class HFCClient {
                     }
                     all_good = all_good && one_good;
                 })
-                if(all_good){
+                if (all_good) {
                     var trxnRequest = {
                         proposalResponses: proposalResponses,
                         proposal: proposal,
                         header: header
                     };
                     var trxnResponse = await channel.sendTransaction(trxnRequest)
-                    isSuccess = (trxnResponse.status == 'SUCCESS') 
-                    this.logger.info(`Transaction status `,trxnResponse)
-                }else{
+                    isSuccess = (trxnResponse.status == 'SUCCESS')
+                    this.logger.info(`Transaction status `, trxnResponse)
+                } else {
                     this.logger.err(`Not all the transaction proposal responses from peer is good for ${chainCodeId} function ${functionName} args ${args}`)
                 }
 
-            }else{
+            } else {
                 this.logger.error(`Application user ${userId} enrollment failure`)
             }
         } catch (exp) {
@@ -381,10 +394,10 @@ export class HFCClient {
      * @param userId string userid
      * @param secret string secret for enrollment
      */
-    public async queryChaincode(channelId:string, chaincodeId:string, functionName:string, args:any[], userId:string):Promise<any>{
+    public async queryChaincode(channelId: string, chaincodeId: string, functionName: string, args: any[], userId: string): Promise<any> {
         let queryOutput = "XXX"
-        let channel:any = null
-        try{
+        let channel: any = null
+        try {
             if (this.channelMap[channelId] != null) {
                 this.logger.debug("Reading from map")
                 channel = this.channelMap[channelId]
@@ -395,13 +408,13 @@ export class HFCClient {
                 this.setupPeers(channel)
                 this.channelMap[channelId] = channel
             }
-           
+
             var appUser = await this.getUser(userId)
-            if(appUser!=null){
+            if (appUser != null) {
                 this.client.setUserContext(appUser)
                 var targets = this.setupPeers(null)
-                for(var index=0;index< targets.length;index++){
-                    var targetPeer  = targets[index]
+                for (var index = 0; index < targets.length; index++) {
+                    var targetPeer = targets[index]
                     var tx_id = this.client.newTransactionID();
                     var queryRequest = {
                         chaincodeId: chaincodeId,
@@ -409,48 +422,52 @@ export class HFCClient {
                         fcn: functionName,
                         args: args
                     };
-                    var queryResponse= await channel.queryByChaincode(queryRequest, targetPeer)
-                    this.logger.debug(`Query response from ${index} peer `,queryResponse)
-                    var isPeerDown = ((queryResponse[0].toString().indexOf('Connect Failed') > -1) || (queryResponse[0].toString().indexOf('REQUEST_TIMEOUT')>-1))
-                    if(!isPeerDown){
+                    var queryResponse = await channel.queryByChaincode(queryRequest, targetPeer)
+                    this.logger.debug(`Query response from ${index} peer `, queryResponse)
+                    var isPeerDown = ((queryResponse[0].toString().indexOf('Connect Failed') > -1) || (queryResponse[0].toString().indexOf('REQUEST_TIMEOUT') > -1))
+                    if (!isPeerDown) {
                         for (let i = 0; i < queryResponse.length; i++) {
                             this.logger.debug(queryResponse[i].toString('utf8'))
-                            queryOutput =queryResponse[i].toString('utf8')
+                            queryOutput = queryResponse[i].toString('utf8')
                             break;
                         }
                         break;
                     }
                 }
-            }else{
+            } else {
                 this.logger.error(`Application user ${userId} enrollment failure`)
             }
-        }catch(exp){
-            this.logger.error(`Query chain code failed ${chaincodeId} ${functionName} ${args}`,exp)
-            queryOutput="TRXN_FAILED"
+        } catch (exp) {
+            this.logger.error(`Query chain code failed ${chaincodeId} ${functionName} ${args}`, exp)
+            queryOutput = "TRXN_FAILED"
         }
-        return new Promise<any>((resolve)=>{resolve(queryOutput)})
+        return new Promise<any>((resolve) => { resolve(queryOutput) })
     }
-        /**
-     * Loads the org admin from the config details 
-     */
-    private async getUser(userId:string): Promise<ApplicationUser> {
-        let usr:ApplicationUser = null
+    /**
+ * Loads the org admin from the config details 
+ */
+    private async getUser(userId: string): Promise<ApplicationUser> {
+        let usr: ApplicationUser = null
         try {
-            var credentialBaseDir = this.readUserCredentials()[userId]
-            var keyPath = path.join(__dirname, credentialBaseDir+"/msp/keystore");
-            var keyPEM = Buffer.from(this.readAllFiles(keyPath)[0]).toString();
-            var certPath = path.join(__dirname, credentialBaseDir+"//msp/signcerts");
-            var certPEM = this.readAllFiles(certPath)[0].toString();
-            var enrolledUser = await this.client.createUser({
-                username: userId, mspid: this.mspId, cryptoContent: {
-                    privateKeyPEM: keyPEM,
-                    signedCertPEM: certPEM
+            if (this.useCAForUserAuth) {
+                usr  = await this.caClient.loginUser(userId,this.readUserCredentials()[userId])
+            } else {
+                var credentialBaseDir = this.readUserCredentials()[userId]
+                var keyPath = path.join(__dirname, credentialBaseDir + "/msp/keystore");
+                var keyPEM = Buffer.from(this.readAllFiles(keyPath)[0]).toString();
+                var certPath = path.join(__dirname, credentialBaseDir + "//msp/signcerts");
+                var certPEM = this.readAllFiles(certPath)[0].toString();
+                var enrolledUser = await this.client.createUser({
+                    username: userId, mspid: this.mspId, cryptoContent: {
+                        privateKeyPEM: keyPEM,
+                        signedCertPEM: certPEM
+                    }
+                })
+                if (enrolledUser != null) {
+                    usr = enrolledUser
                 }
-            })
-            if(enrolledUser!=null){
-                usr = enrolledUser
             }
-            
+
         } catch (exp) {
             this.logger.error(`Error in retriveing the org admin for ${this.org}`, exp)
         }
@@ -480,8 +497,8 @@ export class HFCClient {
         }
         return new Promise<boolean>((resolve) => { resolve(isSuccess) });
     }
-    private readUserCredentials():any {
-        let file_path = path.join(__dirname, "../../user_cred_map.json");
+    private readUserCredentials(): any {
+        let file_path = path.join(__dirname, this.userCredentialPath);
         let data = fs.readFileSync(file_path);
         let credentialMap = JSON.parse(Buffer.from(data).toString())
         return credentialMap
