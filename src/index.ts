@@ -46,7 +46,7 @@ class NetworkDriver {
     private async executeCommands(orgConfig: any, orderers: any[], artifactsDir: string, userCredPath: string, useCa: boolean): Promise<number> {
         let org = process.argv[2]
         let command = process.argv[3]
-        var orgHFCLient = new HFCClient(org, orgConfig, orderers, "~/xxxz", artifactsDir, userCredPath, useCa)
+        var orgHFCLient = new HFCClient(org, orgConfig, orderers, "./kvs_xxxz", artifactsDir, userCredPath, useCa)
         var rslt = await orgHFCLient.init()
         if (rslt) {
             this.logger.info("CA Client Intialization result :" + rslt);
