@@ -443,6 +443,45 @@ export class HFCClient {
         }
         return new Promise<any>((resolve) => { resolve(queryOutput) })
     }
+    public async queryChainInfo(channelId: string,userId: string): Promise<any> {
+        let queryOutput = "XXX"
+        let channel: any = null
+        try {
+            if (this.channelMap[channelId] != null) {
+                this.logger.debug("Reading from map")
+                channel = this.channelMap[channelId]
+            } else {
+                this.logger.debug("Creating new ")
+                channel = this.client.newChannel(channelId)
+                this.setUpOrderers(channel)
+                this.setupPeers(channel)
+                this.channelMap[channelId] = channel
+            }
+
+            var appUser = await this.getUser(userId)
+            if (appUser != null) {
+                this.client.setUserContext(appUser)
+                var targets = this.setupPeers(null)
+                for (var index = 0; index < 1; index++) {
+                    var targetPeer = targets[index]
+                    
+                    var blockChainInfo = await channel.queryInfo(targetPeer)
+                    this.logger.debug(`Query Chain Info response from ${index} peer `, blockChainInfo)
+                    if(blockChainInfo){
+                        this.logger.debug(JSON.stringify(blockChainInfo))
+                        queryOutput = blockChainInfo
+                    }    
+                    
+                }
+            } else {
+                this.logger.error(`Application user ${userId} enrollment failure`)
+            }
+        } catch (exp) {
+            this.logger.error(`queryChainInfo code failed`, exp)
+            queryOutput = "TRXN_FAILED"
+        }
+        return new Promise<any>((resolve) => { resolve(queryOutput) })
+    }
     /**
  * Loads the org admin from the config details 
  */

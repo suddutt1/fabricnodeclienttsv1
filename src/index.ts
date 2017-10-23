@@ -116,7 +116,15 @@ class NetworkDriver {
                 } else {
                     this.logger.error(`Channel id, Chaincode id,init method name  not provided `)
                 }
-            }
+            } else if (command == "chainInfo"){
+                var channelId = process.argv[4]
+                if(channelId !=null){
+                    var isQuerySuccess = await orgHFCLient.queryChainInfo(channelId, org + "_user")
+                    this.logger.info("Blockchain Info  " + isQuerySuccess)
+                }else{
+                    this.logger.error(`Channel id not provided `)
+                }
+            }   
             else {
                 this.logger.error("Invalid command ")
             }
